@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 import { AngularFirestore, AngularFirestoreCollection } from '@angular/fire/firestore';
+import { AngularFireAuth } from '@angular/fire/auth';
+import { auth } from 'firebase/app';
 import { Message } from '../interface/message.interface';
 import { map } from 'rxjs/operators';
 
@@ -8,11 +10,33 @@ import { map } from 'rxjs/operators';
 })
 export class ChatService {
 
-  constructor(private afs: AngularFirestore) {
+  constructor(private afs: AngularFirestore,
+              public afAuth: AngularFireAuth) {
+    this.afAuth.authState.subscribe( user => {
+      if (!user) {
+        return;
+      }
+      this.user.name = user.displayName;
+      this.user.uid = user.uid;
+    });
   }
 
   public chats: Message[] = [];
+  public user: any = {};
   private itemsCollection: AngularFirestoreCollection<Message>;
+
+  login(provider: string) {
+    if (provider === 'google') {
+      this.afAuth.auth.signInWithPopup(new auth.GoogleAuthProvider());
+    } else if (provider === 'twitter') {
+      this.afAuth.auth.signInWithPopup(new auth.TwitterAuthProvider());
+    }
+  }
+
+  logout() {
+    this.user = {};
+    this.afAuth.auth.signOut();
+  }
 
   loadMessages() {
     this.itemsCollection = this.afs.collection<Message>('chats', ref => ref.orderBy('date', 'desc').limit(5));
@@ -27,10 +51,10 @@ export class ChatService {
 
   addMessage(text: string) {
     const message: Message = {
-      name: 'JorgeDemo',
+      name: this.user.name,
       message: text,
       date: new Date().getTime(),
-      uid: ''
+      uid: this.user.uid
     };
     return this.itemsCollection.add( message );
   }
